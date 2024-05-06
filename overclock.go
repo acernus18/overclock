@@ -3,6 +3,7 @@ package overclock
 import (
 	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +11,25 @@ import (
 	"regexp"
 )
 
-func Download(url, destination string) error {
+func Fetch(url string) (string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
+func Download(url, destination string, filenameHandler func(string) string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -26,7 +45,8 @@ func Download(url, destination string) error {
 	if len(matchResult) <= 0 {
 		return errors.New("cannot find valid filename")
 	}
-	file, err := os.Create(path.Join(destination, matchResult[0]))
+	targetFilename := filenameHandler(matchResult[0])
+	file, err := os.Create(path.Join(destination, targetFilename))
 	if err != nil {
 		return err
 	}
@@ -40,6 +60,15 @@ func Download(url, destination string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("downloaded \"%s\" from %s to %s, length = %d bytes", matchResult[0], url, destination, bytesLen)
+	log.Printf("downloaded \"%s\" from %s to %s, length = %d bytes", targetFilename, url, destination, bytesLen)
 	return nil
+}
+
+func DownloadHLSFile(url string) ([]string, error) {
+	pattern := regexp.MustCompile(`\d+.ts`)
+	content, err := Fetch(url)
+	if err != nil {
+		return nil, err
+	}
+	return pattern.FindAllString(content, -1), nil
 }

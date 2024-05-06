@@ -59,3 +59,5 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+encrypt_test.go
